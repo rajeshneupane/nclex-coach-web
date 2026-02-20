@@ -8,37 +8,35 @@ function parseIndexSet(correctIndices) {
       .filter((n) => Number.isFinite(n))
   );
 }
+const norm = (s) => String(s ?? "").toLowerCase().trim();
 
 export default function PracticeView({ questions, attempts, onAddAttempt }) {
-  // --- Setup state (pre-start) ---
   const [started, setStarted] = useState(false);
-  const [setupMode, setSetupMode] = useState("all"); // all | missed
-  const [selectedCategory, setSelectedCategory] = useState("ALL");
-  const [questionCount, setQuestionCount] = useState(10);
+  const [mode, setMode] = useState("all"); // all | missed
+  const [category, setCategory] = useState("ALL");
+  const [count, setCount] = useState(10);
 
-  // --- Session state ---
-  const [session, setSession] = useState([]); // array of question objects
+  // NEW filters
+  const [keyword, setKeyword] = useState("");
+  const [sataOnly, setSataOnly] = useState(false);
+
+  const [session, setSession] = useState([]);
   const [idx, setIdx] = useState(0);
   const [selected, setSelected] = useState(new Set());
   const [submitted, setSubmitted] = useState(false);
   const [wasCorrect, setWasCorrect] = useState(false);
   const [completed, setCompleted] = useState(false);
 
-  // Session scoring
   const [sessionCorrect, setSessionCorrect] = useState(0);
   const [sessionTotal, setSessionTotal] = useState(0);
   const [sessionMissedIds, setSessionMissedIds] = useState(new Set());
 
-  // Latest attempt per question (attempts stored newest-first)
   const latestByQuestion = useMemo(() => {
     const map = new Map();
-    for (const a of attempts) {
-      if (!map.has(a.questionId)) map.set(a.questionId, a);
-    }
+    for (const a of attempts) if (!map.has(a.questionId)) map.set(a.questionId, a);
     return map;
   }, [attempts]);
 
-  // Category list derived from question bank
   const categories = useMemo(() => {
     const set = new Set(questions.map((q) => q.category).filter(Boolean));
     return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
@@ -48,12 +46,6 @@ export default function PracticeView({ questions, attempts, onAddAttempt }) {
     setSelected(new Set());
     setSubmitted(false);
     setWasCorrect(false);
-  };
-
-  const resetRunState = () => {
-    setIdx(0);
-    setCompleted(false);
-    clearSelection();
   };
 
   const newSetup = () => {
@@ -69,75 +61,41 @@ export default function PracticeView({ questions, attempts, onAddAttempt }) {
     setSessionMissedIds(new Set());
   };
 
-  const buildSession = (mode, category, count) => {
+  const buildPool = () => {
     let pool = questions;
 
-    // Filter category
-    if (category && category !== "ALL") {
-      pool = pool.filter((q) => q.category === category);
-    }
+    if (category !== "ALL") pool = pool.filter((q) => q.category === category);
 
-    // Missed mode pool: latest attempt is incorrect
+    const k = norm(keyword);
+    if (k) pool = pool.filter((q) => norm(q.stem).includes(k));
+
+    if (sataOnly) pool = pool.filter((q) => norm(q.kind) === "sata");
+
     if (mode === "missed") {
       const missedIds = new Set(
-        [...latestByQuestion.entries()]
-          .filter(([, a]) => !a.isCorrect)
-          .map(([qid]) => qid)
+        [...latestByQuestion.entries()].filter(([, a]) => !a.isCorrect).map(([qid]) => qid)
       );
       pool = pool.filter((q) => missedIds.has(q.id));
     }
 
-    // Shuffle
-    const shuffled = [...pool].sort(() => Math.random() - 0.5);
-
-    // Take count (but never exceed pool length)
-    const take = Math.max(1, Math.min(count, shuffled.length));
-    return shuffled.slice(0, take);
+    return pool;
   };
 
-  const startSession = () => {
-    if (questions.length === 0) return;
-
-    const s = buildSession(setupMode, selectedCategory, questionCount);
-
-    if (s.length === 0) {
-      // nothing to practice (e.g., missed mode has no missed)
-      setSession([]);
-      setStarted(true);
-      setSessionTotal(0);
-      setSessionCorrect(0);
-      setSessionMissedIds(new Set());
-      setCompleted(true);
-      return;
-    }
+  const start = () => {
+    const pool = buildPool();
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+    const take = Math.max(1, Math.min(count, shuffled.length));
+    const s = shuffled.slice(0, take);
 
     setSession(s);
     setStarted(true);
+    setIdx(0);
+    setCompleted(s.length === 0);
+    clearSelection();
 
     setSessionTotal(s.length);
     setSessionCorrect(0);
     setSessionMissedIds(new Set());
-
-    resetRunState();
-  };
-
-  const restartSameSession = () => {
-    // keeps same session question list
-    setSessionCorrect(0);
-    setSessionMissedIds(new Set());
-    resetRunState();
-  };
-
-  const retryMissedThisSession = () => {
-    const missedSet = sessionMissedIds;
-    const missedQs = session.filter((q) => missedSet.has(q.id));
-    if (missedQs.length === 0) return;
-
-    setSession(missedQs);
-    setSessionTotal(missedQs.length);
-    setSessionCorrect(0);
-    setSessionMissedIds(new Set());
-    resetRunState();
   };
 
   const toggle = (i) => {
@@ -145,10 +103,9 @@ export default function PracticeView({ questions, attempts, onAddAttempt }) {
     const q = session[idx];
     if (!q) return;
 
-    const kind = String(q.kind || "single").toLowerCase();
-    if (kind === "single") {
-      setSelected(new Set([i]));
-    } else {
+    const kind = norm(q.kind || "single");
+    if (kind === "single") setSelected(new Set([i]));
+    else {
       const next = new Set(selected);
       next.has(i) ? next.delete(i) : next.add(i);
       setSelected(next);
@@ -160,310 +117,177 @@ export default function PracticeView({ questions, attempts, onAddAttempt }) {
     if (!q || selected.size === 0) return;
 
     const correct = parseIndexSet(q.correctIndices);
-    const isCorrect =
-      selected.size === correct.size && [...selected].every((x) => correct.has(x));
+    const ok = selected.size === correct.size && [...selected].every((x) => correct.has(x));
 
     setSubmitted(true);
-    setWasCorrect(isCorrect);
+    setWasCorrect(ok);
 
-    // session score
-    if (isCorrect) {
-      setSessionCorrect((c) => c + 1);
-    } else {
-      setSessionMissedIds((prev) => {
-        const next = new Set(prev);
-        next.add(q.id);
-        return next;
-      });
-    }
+    if (ok) setSessionCorrect((c) => c + 1);
+    else setSessionMissedIds((prev) => new Set(prev).add(q.id));
 
-    // global attempts history for stats
     onAddAttempt({
       id: crypto.randomUUID(),
       questionId: q.id,
       category: q.category,
       selected: [...selected].sort((a, b) => a - b),
-      isCorrect,
+      isCorrect: ok,
       attemptedAt: Date.now(),
     });
   };
 
   const next = () => {
-    if (session.length === 0) return;
-
     const nextIdx = idx + 1;
     if (nextIdx >= session.length) {
       setCompleted(true);
       return;
     }
-
     setIdx(nextIdx);
     clearSelection();
   };
 
-  // ---------------- UI ----------------
+  const poolCount = buildPool().length;
 
   if (questions.length === 0) {
-    return <div style={{ color: "#666" }}>No questions yet. Import a CSV first.</div>;
+    return <div className="card"><h2>Practice</h2><div className="muted">Import questions first.</div></div>;
   }
 
-  // Setup screen (before start)
   if (!started) {
     return (
-      <div style={{ display: "grid", gap: 14 }}>
-        <h2 style={{ margin: 0 }}>Practice Setup</h2>
+      <div className="grid">
+        <div className="card">
+          <h2>Practice Setup</h2>
 
-        <div style={{ padding: 12, border: "1px solid #eee", borderRadius: 12, display: "grid", gap: 12 }}>
-          <div>
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>Mode</div>
-            <label style={{ marginRight: 14 }}>
-              <input
-                type="radio"
-                name="mode"
-                checked={setupMode === "all"}
-                onChange={() => setSetupMode("all")}
-              />{" "}
-              All questions
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="mode"
-                checked={setupMode === "missed"}
-                onChange={() => setSetupMode("missed")}
-              />{" "}
-              Missed only (based on latest attempt)
-            </label>
-          </div>
-
-          <div>
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>Category</div>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              style={{ padding: 8, borderRadius: 10, border: "1px solid #ddd", width: "min(420px, 100%)" }}
-            >
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c === "ALL" ? "All Categories" : c}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>Number of Questions</div>
-            <input
-              type="number"
-              min={1}
-              max={200}
-              value={questionCount}
-              onChange={(e) => setQuestionCount(parseInt(e.target.value || "10", 10))}
-              style={{ padding: 8, borderRadius: 10, border: "1px solid #ddd", width: 140 }}
-            />
-            <div style={{ fontSize: 12, color: "#666", marginTop: 6 }}>
-              Tip: If the pool is smaller than this number, it will use the available count.
+          <div className="grid">
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>Mode</div>
+              <label style={{ marginRight: 14 }}>
+                <input type="radio" checked={mode === "all"} onChange={() => setMode("all")} /> All
+              </label>
+              <label>
+                <input type="radio" checked={mode === "missed"} onChange={() => setMode("missed")} /> Missed only
+              </label>
             </div>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 220px" }}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Category</div>
+                <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ width: "100%" }}>
+                  {categories.map((c) => (
+                    <option key={c} value={c}>{c === "ALL" ? "All Categories" : c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ flex: "1 1 260px" }}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Keyword</div>
+                <input className="input" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Search in question text" style={{ width: "100%" }} />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+              <label className="pill" style={{ cursor: "pointer" }}>
+                <input type="checkbox" checked={sataOnly} onChange={(e) => setSataOnly(e.target.checked)} style={{ marginRight: 8 }} />
+                SATA only
+              </label>
+
+              <div style={{ flex: 1 }} />
+
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Questions</div>
+                <input className="input" type="number" min={1} max={200} value={count} onChange={(e) => setCount(parseInt(e.target.value || "10", 10))} style={{ width: 120 }} />
+              </div>
+            </div>
+
+            <div className="muted">Pool matched: <b>{poolCount}</b></div>
+
+            <button className="btn primary" onClick={start} style={{ width: 180 }}>
+              Start
+            </button>
           </div>
-
-          <button
-            onClick={startSession}
-            style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd", width: 180 }}
-          >
-            Start
-          </button>
-        </div>
-
-        <div style={{ color: "#666" }}>
-          Bank: <b>{questions.length}</b> questions • Attempts: <b>{attempts.length}</b>
         </div>
       </div>
     );
   }
 
-  // Session Complete screen
   if (completed) {
-    const missedCount = sessionMissedIds.size;
-
     return (
-      <div style={{ display: "grid", gap: 12 }}>
-        <h2 style={{ margin: 0 }}>Session Complete</h2>
-
-        <div style={{ padding: 12, border: "1px solid #eee", borderRadius: 12 }}>
-          <div>
-            Score: <b>{sessionCorrect}</b> / <b>{sessionTotal}</b>
-          </div>
-          <div style={{ color: "#666", marginTop: 6 }}>
-            Missed this session: <b>{missedCount}</b>
+      <div className="grid">
+        <div className="card">
+          <h2>Session Complete</h2>
+          <div className="muted">Score: <b>{sessionCorrect}</b> / <b>{sessionTotal}</b></div>
+          <div style={{ height: 10 }} />
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button className="btn" onClick={() => { setStarted(false); setCompleted(false); }}>Back to Setup</button>
+            <button className="btn primary" onClick={newSetup}>New Setup</button>
           </div>
         </div>
-
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button
-            onClick={restartSameSession}
-            style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd" }}
-          >
-            Restart Same Session
-          </button>
-
-          <button
-            onClick={newSetup}
-            style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd" }}
-          >
-            New Setup
-          </button>
-
-          <button
-            disabled={missedCount === 0}
-            onClick={retryMissedThisSession}
-            style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd" }}
-          >
-            Retry Missed (This Session)
-          </button>
-        </div>
-
-        <div style={{ color: "#666" }}>Tip: Check Stats for mastery and weak areas.</div>
       </div>
     );
   }
 
-  // Question view
   const q = session[idx];
-  if (!q) {
-    return (
-      <div style={{ display: "grid", gap: 12 }}>
-        <div style={{ color: "#666" }}>No questions available for this setup.</div>
-        <button onClick={newSetup} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd", width: 140 }}>
-          New Setup
-        </button>
-      </div>
-    );
-  }
+  if (!q) return <div className="card"><h2>Practice</h2><div className="muted">No questions for this setup.</div><button className="btn" onClick={newSetup}>Back</button></div>;
 
   const correctSet = parseIndexSet(q.correctIndices);
-  const kind = String(q.kind || "single").toLowerCase();
+  const kind = norm(q.kind || "single");
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <span style={{ color: "#666" }}>
-          {idx + 1}/{session.length}
-        </span>
-
-        <span style={{ color: "#666" }}>
-          Session Score: <b>{sessionCorrect}</b> / <b>{sessionTotal}</b>
-        </span>
-
-        <span style={{ marginLeft: "auto", color: "#666" }}>
-          <button onClick={newSetup} style={{ padding: "6px 10px", borderRadius: 10, border: "1px solid #ddd" }}>
-            Setup
-          </button>
-        </span>
-      </div>
-
-      <div style={{ padding: 12, border: "1px solid #eee", borderRadius: 12 }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid #ddd" }}>
-            {q.category}
-          </span>
-
-          {kind === "sata" && (
-            <span style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid #ddd" }}>
-              SATA
-            </span>
-          )}
+    <div className="grid">
+      <div className="card">
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span className="pill">{q.category}</span>
+          {kind === "sata" && <span className="pill">SATA</span>}
+          <span className="pill">{idx + 1}/{session.length}</span>
+          <span className="pill">Score {sessionCorrect}/{sessionTotal}</span>
+          <div style={{ flex: 1 }} />
+          <button className="btn" onClick={newSetup}>Setup</button>
         </div>
 
-        <h3 style={{ marginTop: 10 }}>{q.stem}</h3>
+        <div style={{ height: 10 }} />
+        <h3>{q.stem}</h3>
 
-        <div style={{ display: "grid", gap: 8 }}>
+        <div className="grid">
           {q.options.map((opt, i) => {
             const isSelected = selected.has(i);
             const isCorrect = correctSet.has(i);
 
-            let bg = "#fff";
-            if (!submitted) {
-              bg = isSelected ? "#eef" : "#fff";
-            } else {
-              if (isCorrect) bg = "#eaffea";
-              else if (isSelected && !isCorrect) bg = "#ffecec";
-              else bg = "#fff";
-            }
+            let bg = "rgba(15,23,48,.85)";
+            let border = "var(--border)";
+            if (!submitted && isSelected) { bg = "rgba(106,166,255,.22)"; border = "rgba(106,166,255,.45)"; }
+            if (submitted && isCorrect) { bg = "rgba(52,211,153,.18)"; border = "rgba(52,211,153,.35)"; }
+            if (submitted && isSelected && !isCorrect) { bg = "rgba(251,113,133,.18)"; border = "rgba(251,113,133,.35)"; }
 
-            const icon =
-              kind === "sata"
-                ? isSelected
-                  ? "☑"
-                  : "☐"
-                : isSelected
-                ? "◉"
-                : "○";
+            const icon = kind === "sata" ? (isSelected ? "☑" : "☐") : (isSelected ? "◉" : "○");
 
             return (
               <button
                 key={i}
+                className="btn"
                 onClick={() => toggle(i)}
-                style={{
-                  textAlign: "left",
-                  padding: 12,
-                  borderRadius: 12,
-                  border: "1px solid #ddd",
-                  background: bg,
-                  color: "#111",
-                  cursor: "pointer",
-                }}
+                style={{ textAlign: "left", background: bg, borderColor: border, display: "flex", gap: 10, alignItems: "flex-start" }}
               >
-                <div style={{ display: "flex", gap: 10 }}>
-                  <span style={{ width: 22 }}>{icon}</span>
-                  <span>{opt}</span>
-                </div>
+                <span style={{ width: 22 }}>{icon}</span>
+                <span>{opt}</span>
               </button>
             );
           })}
         </div>
 
         {submitted && (
-          <div
-            style={{
-              marginTop: 12,
-              padding: 12,
-              borderRadius: 12,
-              background: "#f7f7f7",
-              color: "#111",
-            }}
-          >
+          <div className="card" style={{ marginTop: 12, background: "rgba(18,28,57,.55)" }}>
             <b>{wasCorrect ? "Correct" : "Incorrect"}</b>
-            {q.rationale ? <div style={{ marginTop: 6, color: "#555" }}>{q.rationale}</div> : null}
+            {q.rationale ? <div className="muted" style={{ marginTop: 6 }}>{q.rationale}</div> : null}
           </div>
         )}
-      </div>
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        {!submitted ? (
-          <button
-            onClick={submit}
-            disabled={selected.size === 0}
-            style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd" }}
-          >
-            Submit
-          </button>
-        ) : (
-          <button
-            onClick={next}
-            style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd" }}
-          >
-            Next
-          </button>
-        )}
-
-        {!submitted && selected.size > 0 && (
-          <button
-            onClick={clearSelection}
-            style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd" }}
-          >
-            Clear
-          </button>
-        )}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+          {!submitted ? (
+            <button className="btn primary" onClick={submit} disabled={selected.size === 0}>Submit</button>
+          ) : (
+            <button className="btn primary" onClick={next}>Next</button>
+          )}
+          {!submitted && selected.size > 0 && <button className="btn" onClick={() => setSelected(new Set())}>Clear</button>}
+        </div>
       </div>
     </div>
   );

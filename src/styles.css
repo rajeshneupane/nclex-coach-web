@@ -1,0 +1,86 @@
+:root{
+  --bg:#0b1020;
+  --panel:#0f1730;
+  --card:#121c39;
+  --border:rgba(255,255,255,.10);
+  --text:#e8eefc;
+  --muted:rgba(232,238,252,.70);
+  --accent:#6aa6ff;
+  --accent2:#8b5cf6;
+  --shadow: 0 10px 30px rgba(0,0,0,.25);
+  --radius: 16px;
+}
+
+html,body,#root{height:100%;margin:0}
+body{
+  background: radial-gradient(1200px 700px at 20% 0%, rgba(106,166,255,.25), transparent 60%),
+              radial-gradient(900px 600px at 90% 10%, rgba(139,92,246,.25), transparent 60%),
+              var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+.container{max-width: 980px; margin: 0 auto; padding: 18px}
+.topbar{
+  display:flex; align-items:center; justify-content:space-between; gap: 12px;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: rgba(15,23,48,.70); backdrop-filter: blur(8px);
+  box-shadow: var(--shadow);
+}
+.brand h1{margin:0; font-size: 18px}
+.sub{color: var(--muted); font-size: 12px; margin-top: 2px}
+
+.tabs{display:flex; gap: 8px; flex-wrap:wrap}
+.tab{
+  border: 1px solid var(--border);
+  background: rgba(18,28,57,.65);
+  color: var(--text);
+  padding: 9px 12px;
+  border-radius: 999px;
+  cursor:pointer;
+}
+.tab.active{
+  background: linear-gradient(90deg, rgba(106,166,255,.28), rgba(139,92,246,.24));
+  border-color: rgba(106,166,255,.45);
+}
+
+.card{
+  border:1px solid var(--border);
+  background: rgba(18,28,57,.75);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+.grid{display:grid; gap: 12px}
+.pill{
+  display:inline-flex; align-items:center; gap: 6px;
+  border:1px solid var(--border);
+  background: rgba(15,23,48,.70);
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.btn{
+  border:1px solid var(--border);
+  background: rgba(15,23,48,.85);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor:pointer;
+}
+.btn.primary{
+  border-color: rgba(106,166,255,.45);
+  background: linear-gradient(90deg, rgba(106,166,255,.35), rgba(139,92,246,.30));
+}
+.btn:disabled{opacity:.55; cursor:not-allowed}
+
+.input, select{
+  border:1px solid var(--border);
+  background: rgba(15,23,48,.85);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 12px;
+  outline:none;
+}
