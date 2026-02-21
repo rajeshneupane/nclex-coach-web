@@ -1,0 +1,45 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2868
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 import \{ defineConfig \} from "vite";\
+import react from "@vitejs/plugin-react";\
+import \{ VitePWA \} from "vite-plugin-pwa";\
+\
+export default defineConfig(\{\
+  plugins: [\
+    react(),\
+    VitePWA(\{\
+      registerType: "autoUpdate",\
+      injectRegister: "auto",\
+      workbox: \{\
+        // keep it simple: cache the app shell, not your Supabase data\
+        navigateFallback: "/index.html",\
+      \},\
+      includeAssets: ["apple-touch-icon.png", "favicon.ico", "favicon.svg"],\
+      manifest: \{\
+        name: "NCLEX Coach",\
+        short_name: "NCLEX Coach",\
+        description: "Practice questions and stats for NCLEX prep",\
+        theme_color: "#0b1020",\
+        background_color: "#0b1020",\
+        display: "standalone",\
+        scope: "/",\
+        start_url: "/",\
+        icons: [\
+          \{ src: "/pwa-192x192.png", sizes: "192x192", type: "image/png" \},\
+          \{ src: "/pwa-512x512.png", sizes: "512x512", type: "image/png" \},\
+          \{\
+            src: "/pwa-512x512.png",\
+            sizes: "512x512",\
+            type: "image/png",\
+            purpose: "any maskable",\
+          \},\
+        ],\
+      \},\
+    \}),\
+  ],\
+\});}
