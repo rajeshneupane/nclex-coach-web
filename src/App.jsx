@@ -3,6 +3,7 @@ import PracticeView from "./PracticeView";
 import ImportView from "./ImportView";
 import StatsView from "./StatsView";
 import AuthBar from "./AuthBar";
+import InstallPrompt from "./InstallPrompt";
 import { loadState, saveState } from "./storage";
 import { pullCloudState, pushCloudState } from "./sync";
 
@@ -57,8 +58,6 @@ export default function App() {
         console.warn("Cloud pull failed:", e);
       }
     })();
-    // We intentionally don't include questions/attempts as deps here,
-    // so logging in doesn't re-trigger pull mid-session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
@@ -92,14 +91,36 @@ export default function App() {
   return (
     <div className="container">
       <div className="topbar">
-        <div className="brand">
-          <h1>NCLEX Coach</h1>
-          <div className="sub">
-            {questions.length} questions • {attempts.length} attempts
+        {/* Brand with icon (always visible) */}
+        <div className="brand" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <img
+            src="/pwa-192x192.png"
+            alt="NCLEX Coach"
+            width={36}
+            height={36}
+            style={{
+              borderRadius: 10,
+              border: "1px solid rgba(255,255,255,.12)",
+              boxShadow: "0 6px 18px rgba(0,0,0,.25)",
+            }}
+          />
+          <div>
+            <h1 style={{ margin: 0, fontSize: 18 }}>NCLEX Coach</h1>
+            <div className="sub">
+              {questions.length} questions • {attempts.length} attempts
+            </div>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
+          }}
+        >
           <div className="tabs">
             <TabBtn id="home" label="Home" />
             <TabBtn id="practice" label="Practice" />
@@ -115,29 +136,73 @@ export default function App() {
 
       {tab === "home" && (
         <div className="grid">
+          {/* Install prompt (Android button / iOS instructions) */}
+          <InstallPrompt />
+          <div style={{ height: 12 }} />
+
+          {/* Home hero with large icon */}
+          <div
+            className="card"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 18,
+              marginBottom: 18,
+              background: "linear-gradient(135deg, rgba(106,166,255,.15), rgba(139,92,246,.15))",
+            }}
+          >
+            <img
+              src="/pwa-512x512.png"
+              alt="NCLEX Coach"
+              width={72}
+              height={72}
+              style={{
+                borderRadius: 18,
+                border: "1px solid rgba(255,255,255,.18)",
+                boxShadow: "0 10px 30px rgba(0,0,0,.35)",
+              }}
+            />
+            <div>
+              <h2 style={{ margin: 0 }}>Welcome to NCLEX Coach</h2>
+              <div className="muted" style={{ marginTop: 6 }}>
+                Practice smarter. Track mastery. Pass with confidence.
+              </div>
+            </div>
+          </div>
+
           <div className="card">
             <h2>Home</h2>
 
             <div style={{ display: "grid", gap: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                 <span className="muted">Question bank</span>
-                <span><b>{questions.length}</b></span>
+                <span>
+                  <b>{questions.length}</b>
+                </span>
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                 <span className="muted">Total attempts</span>
-                <span><b>{attempts.length}</b></span>
+                <span>
+                  <b>{attempts.length}</b>
+                </span>
               </div>
             </div>
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
-              <button className="btn primary" onClick={() => setTab("practice")}>Start Practice</button>
-              <button className="btn" onClick={() => setTab("import")}>Import Questions</button>
-              <button className="btn" onClick={() => setTab("stats")}>View Stats</button>
+              <button className="btn primary" onClick={() => setTab("practice")}>
+                Start Practice
+              </button>
+              <button className="btn" onClick={() => setTab("import")}>
+                Import Questions
+              </button>
+              <button className="btn" onClick={() => setTab("stats")}>
+                View Stats
+              </button>
             </div>
 
             <div className="muted" style={{ marginTop: 10 }}>
-              Optional sync: sign in with email to keep progress across devices.
+              Optional sync: sign in to keep progress across devices.
             </div>
           </div>
         </div>
